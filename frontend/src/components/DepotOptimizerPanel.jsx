@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
 import { runStablingOptimization } from '../utils/stablingOptimizer';
 
-export default function DepotOptimizerPanel({ fleetData, onApplyOptimization }) {
+export default function DepotOptimizerPanel({ fleetData = [], onApplyOptimization }) {
   const [optimizationResult, setOptimizationResult] = useState(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
+
+  // Safely ensure fleetData is an array
+  const safeFleetData = Array.isArray(fleetData) ? fleetData : [];
 
   const handleRunAlgorithm = () => {
     setIsOptimizing(true);
     setTimeout(() => {
-      const result = runStablingOptimization(fleetData || []);
+      const result = runStablingOptimization(safeFleetData);
       setOptimizationResult(result);
       setIsOptimizing(false);
       if (onApplyOptimization) {
         onApplyOptimization(result);
       }
-    }, 600); // Simulated processing delay
+    }, 600);
   };
 
   return (
@@ -57,7 +60,9 @@ export default function DepotOptimizerPanel({ fleetData, onApplyOptimization }) 
             </div>
             <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl">
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Capacity Bottlenecks</span>
-              <strong className="text-xl text-rose-400 font-black">{optimizationResult.warnings.length} Alerts</strong>
+              <strong className="text-xl text-rose-400 font-black">
+                {Array.isArray(optimizationResult.warnings) ? optimizationResult.warnings.length : 0} Alerts
+              </strong>
             </div>
           </div>
 
@@ -75,14 +80,14 @@ export default function DepotOptimizerPanel({ fleetData, onApplyOptimization }) 
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 bg-slate-900/40">
-                {optimizationResult.assignments.map((item) => (
+                {(optimizationResult.assignments || []).map((item) => (
                   <tr key={item.trainId} className="hover:bg-slate-800/50 transition">
                     <td className="p-3 font-extrabold text-white">
-                      {item.recommendedBay.startsWith('Bay') ? item.recommendedBay : `Bay #${item.recommendedBay}`}
+                      {String(item.recommendedBay || '').includes('Bay') ? item.recommendedBay : `Bay #${item.recommendedBay}`}
                     </td>
                     <td className="p-3 font-bold text-teal-400">{item.trainId}</td>
                     <td className="p-3 text-slate-400">
-                      {item.currentBay.startsWith('Bay') ? item.currentBay : `Bay #${item.currentBay}`}
+                      {String(item.currentBay || '').includes('Bay') ? item.currentBay : `Bay #${item.currentBay}`}
                     </td>
                     <td className="p-3">
                       <span className={`border text-[10px] px-2 py-0.5 rounded font-mono font-semibold ${
