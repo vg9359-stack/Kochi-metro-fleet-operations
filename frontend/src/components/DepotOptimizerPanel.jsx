@@ -1,20 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { runStablingOptimization } from '../utils/stablingOptimizer';
 
 export default function DepotOptimizerPanel({ fleetData = [], onApplyOptimization }) {
   const [optimizationResult, setOptimizationResult] = useState(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const timerRef = useRef(null);
 
-  // Safely ensure fleetData is an array
-  const safeFleetData = Array.isArray(fleetData) ? fleetData : [];
+  // Clean up timer on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  // Guarantee array safety
+  const safeFleetData = Array.isArray(fleetData)
+    ? fleetData.filter((item) => item && typeof item === 'object')
+    : [];
 
   const handleRunAlgorithm = () => {
     setIsOptimizing(true);
-    setTimeout(() => {
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(() => {
       const result = runStablingOptimization(safeFleetData);
       setOptimizationResult(result);
       setIsOptimizing(false);
-      if (onApplyOptimization) {
+
+      if (typeof onApplyOptimization === 'function') {
         onApplyOptimization(result);
       }
     }, 600);
@@ -39,7 +53,7 @@ export default function DepotOptimizerPanel({ fleetData = [], onApplyOptimizatio
         <button
           onClick={handleRunAlgorithm}
           disabled={isOptimizing}
-          className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg hover:shadow-teal-500/20 disabled:opacity-50"
+          className="bg-teal-500 hover:bg-teal-400 active:scale-95 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg hover:shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isOptimizing ? 'Running Optimization Engine...' : '⚡ Run Auto-Stabling Algorithm'}
         </button>
@@ -52,11 +66,15 @@ export default function DepotOptimizerPanel({ fleetData = [], onApplyOptimizatio
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl">
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Efficiency Rating</span>
-              <strong className="text-xl text-teal-400 font-black">{optimizationResult.optimizationScore}%</strong>
+              <strong className="text-xl text-teal-400 font-black">
+                {optimizationResult.optimizationScore ?? 100}%
+              </strong>
             </div>
             <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl">
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Required Shunting Movements</span>
-              <strong className="text-xl text-amber-400 font-black">{optimizationResult.shuntingCount} Moves</strong>
+              <strong className="text-xl text-amber-400 font-black">
+                {optimizationResult.shuntingCount ?? 0} Moves
+              </strong>
             </div>
             <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl">
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Capacity Bottlenecks</span>
@@ -68,7 +86,7 @@ export default function DepotOptimizerPanel({ fleetData = [], onApplyOptimizatio
 
           {/* Allocation Table */}
           <div className="max-h-[420px] overflow-y-auto border border-slate-800 rounded-xl">
-            <table className="w-full text-left text-xs text-slate-300">
+            <table className="w-full text-left text-xs text-slate-300 border-collapse">
               <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold sticky top-0 border-b border-slate-800 z-10">
                 <tr>
                   <th className="p-3">Rec. Bay</th>
@@ -80,40 +98,46 @@ export default function DepotOptimizerPanel({ fleetData = [], onApplyOptimizatio
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 bg-slate-900/40">
-                {(optimizationResult.assignments || []).map((item) => (
-                  <tr key={item.trainId} className="hover:bg-slate-800/50 transition">
-                    <td className="p-3 font-extrabold text-white">
-                      {String(item.recommendedBay || '').includes('Bay') ? item.recommendedBay : `Bay #${item.recommendedBay}`}
-                    </td>
-                    <td className="p-3 font-bold text-teal-400">{item.trainId}</td>
-                    <td className="p-3 text-slate-400">
-                      {String(item.currentBay || '').includes('Bay') ? item.currentBay : `Bay #${item.currentBay}`}
-                    </td>
-                    <td className="p-3">
-                      <span className={`border text-[10px] px-2 py-0.5 rounded font-mono font-semibold ${
-                        item.zone === 'MAINTENANCE_PITS'
-                          ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                          : item.zone === 'EXPRESS_INDUCTION'
-                          ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
-                          : 'bg-slate-800 text-slate-300 border-slate-700'
-                      }`}>
-                        {item.zone}
-                      </span>
-                    </td>
-                    <td className="p-3 text-slate-300">{item.reason}</td>
-                    <td className="p-3 text-right">
-                      {item.requiresShunting ? (
-                        <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2.5 py-1 rounded-md">
-                          Shunt Required
+                {(optimizationResult.assignments || []).map((item, index) => {
+                  const trainKey = item.trainId || `train-${index}`;
+                  const recBayDisplay = item.bayNumber ? `Bay #${item.bayNumber}` : String(item.recommendedBay || 'Unassigned');
+                  const currBayDisplay = String(item.currentBay || 'Unassigned').startsWith('Bay') 
+                    ? item.currentBay 
+                    : `Bay #${item.currentBay}`;
+
+                  return (
+                    <tr key={trainKey} className="hover:bg-slate-800/50 transition">
+                      <td className="p-3 font-extrabold text-white">{recBayDisplay}</td>
+                      <td className="p-3 font-bold text-teal-400">{item.trainId || 'N/A'}</td>
+                      <td className="p-3 text-slate-400">{currBayDisplay}</td>
+                      <td className="p-3">
+                        <span
+                          className={`border text-[10px] px-2 py-0.5 rounded font-mono font-semibold ${
+                            item.zone === 'MAINTENANCE_PITS'
+                              ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                              : item.zone === 'EXPRESS_INDUCTION'
+                              ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                              : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          {item.zone || 'STANDARD'}
                         </span>
-                      ) : (
-                        <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-1 rounded-md">
-                          In Position
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="p-3 text-slate-300">{item.reason || 'Standard Stabling'}</td>
+                      <td className="p-3 text-right">
+                        {item.requiresShunting ? (
+                          <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2.5 py-1 rounded-md">
+                            Shunt Required
+                          </span>
+                        ) : (
+                          <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-1 rounded-md">
+                            In Position
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

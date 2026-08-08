@@ -3,30 +3,41 @@ import OpenTrackMap from './components/OpenTrackMap';
 import PredictiveMaintenancePanel from './components/PredictiveMaintenancePanel';
 import DepotOptimizerPanel from './components/DepotOptimizerPanel';
 
-// Initial Master Fleet Generator (25 Trains)
-const INITIAL_FLEET = Array.from({ length: 25 }, (_, idx) => {
-  const bayNum = idx + 1;
-  const trainId = `TS-${String(bayNum).padStart(2, '0')}`;
-  
-  const status = [3, 8, 14, 19].includes(bayNum) 
-    ? 'MAINTENANCE_BLOCKED' 
-    : [2, 7, 12, 17, 22].includes(bayNum) 
-    ? 'STANDBY' 
-    : 'INDUCTION_READY';
+// Realistic Initial Fleet Generator (25 Trains with mixed current bays)
+const INITIAL_FLEET = [
+  // Maintenance Blocked trains (Some already in pit bays 1-5, some elsewhere)
+  { id: 'TS-01', train_number: 'TS-01', stabling_bay: 1, displayStatus: 'MAINTENANCE_BLOCKED', mileage_km: 42000, hvac_hours: 3100, brake_wear_pct: 92, motor_temp_c: 82, branding_sla_hours_needed: 5.0, reason_code: 'Brake Disc Wear Defect' },
+  { id: 'TS-02', train_number: 'TS-02', stabling_bay: 2, displayStatus: 'MAINTENANCE_BLOCKED', mileage_km: 38000, hvac_hours: 2900, brake_wear_pct: 88, motor_temp_c: 79, branding_sla_hours_needed: 12.0, reason_code: 'HVAC Compressor Failure' },
+  { id: 'TS-03', train_number: 'TS-03', stabling_bay: 14, displayStatus: 'MAINTENANCE_BLOCKED', mileage_km: 44000, hvac_hours: 3200, brake_wear_pct: 95, motor_temp_c: 84, branding_sla_hours_needed: 2.0, reason_code: 'Brake Disc Wear Defect' },
+  { id: 'TS-04', train_number: 'TS-04', stabling_bay: 19, displayStatus: 'MAINTENANCE_BLOCKED', mileage_km: 39500, hvac_hours: 2800, brake_wear_pct: 91, motor_temp_c: 81, branding_sla_hours_needed: 8.5, reason_code: 'Traction Motor Overheat' },
 
-  return {
-    id: trainId,
-    train_number: trainId,
-    stabling_bay: bayNum,
-    displayStatus: status,
-    mileage_km: 12000 + ((bayNum * 1850) % 45000),
-    hvac_hours: Math.round(800 + ((bayNum * 140) % 3200)),
-    brake_wear_pct: Math.min(95, Math.round(((12000 + ((bayNum * 1850) % 45000)) / 60000) * 100)),
-    motor_temp_c: 62 + (bayNum % 22),
-    branding_sla_hours_needed: Number(((bayNum * 3.5) % 36.0).toFixed(1)),
-    reason_code: status === 'MAINTENANCE_BLOCKED' ? 'Brake Pad / Disc Wear Defect' : null
-  };
-});
+  // Express / High Priority Ready Trains (Some in express bays 16-25, some in main lines)
+  { id: 'TS-05', train_number: 'TS-05', stabling_bay: 16, displayStatus: 'INDUCTION_READY', mileage_km: 15000, hvac_hours: 1200, brake_wear_pct: 25, motor_temp_c: 64, branding_sla_hours_needed: 28.0, reason_code: null },
+  { id: 'TS-06', train_number: 'TS-06', stabling_bay: 17, displayStatus: 'INDUCTION_READY', mileage_km: 18000, hvac_hours: 1400, brake_wear_pct: 30, motor_temp_c: 65, branding_sla_hours_needed: 24.5, reason_code: null },
+  { id: 'TS-07', train_number: 'TS-07', stabling_bay: 18, displayStatus: 'INDUCTION_READY', mileage_km: 16500, hvac_hours: 1300, brake_wear_pct: 28, motor_temp_c: 63, branding_sla_hours_needed: 22.0, reason_code: null },
+  { id: 'TS-08', train_number: 'TS-08', stabling_bay: 7, displayStatus: 'INDUCTION_READY', mileage_km: 21000, hvac_hours: 1600, brake_wear_pct: 35, motor_temp_c: 66, branding_sla_hours_needed: 20.0, reason_code: null },
+
+  // Standard Main Stabling Line Trains (Bays 6-15)
+  { id: 'TS-09', train_number: 'TS-09', stabling_bay: 6, displayStatus: 'INDUCTION_READY', mileage_km: 25000, hvac_hours: 1900, brake_wear_pct: 42, motor_temp_c: 68, branding_sla_hours_needed: 10.0, reason_code: null },
+  { id: 'TS-10', train_number: 'TS-10', stabling_bay: 7, displayStatus: 'INDUCTION_READY', mileage_km: 27000, hvac_hours: 2000, brake_wear_pct: 45, motor_temp_c: 69, branding_sla_hours_needed: 8.0, reason_code: null },
+  { id: 'TS-11', train_number: 'TS-11', stabling_bay: 8, displayStatus: 'INDUCTION_READY', mileage_km: 22000, hvac_hours: 1700, brake_wear_pct: 38, motor_temp_c: 67, branding_sla_hours_needed: 12.0, reason_code: null },
+  { id: 'TS-12', train_number: 'TS-12', stabling_bay: 9, displayStatus: 'INDUCTION_READY', mileage_km: 23500, hvac_hours: 1800, brake_wear_pct: 40, motor_temp_c: 67, branding_sla_hours_needed: 6.0, reason_code: null },
+  { id: 'TS-13', train_number: 'TS-13', stabling_bay: 10, displayStatus: 'INDUCTION_READY', mileage_km: 29000, hvac_hours: 2100, brake_wear_pct: 48, motor_temp_c: 70, branding_sla_hours_needed: 14.0, reason_code: null },
+  { id: 'TS-14', train_number: 'TS-14', stabling_bay: 11, displayStatus: 'INDUCTION_READY', mileage_km: 31000, hvac_hours: 2300, brake_wear_pct: 52, motor_temp_c: 71, branding_sla_hours_needed: 4.0, reason_code: null },
+  { id: 'TS-15', train_number: 'TS-15', stabling_bay: 12, displayStatus: 'INDUCTION_READY', mileage_km: 28000, hvac_hours: 2050, brake_wear_pct: 46, motor_temp_c: 69, branding_sla_hours_needed: 9.0, reason_code: null },
+  { id: 'TS-16', train_number: 'TS-16', stabling_bay: 13, displayStatus: 'INDUCTION_READY', mileage_km: 30000, hvac_hours: 2200, brake_wear_pct: 50, motor_temp_c: 70, branding_sla_hours_needed: 11.0, reason_code: null },
+
+  // Remaining Standby & Secondary Units
+  { id: 'TS-17', train_number: 'TS-17', stabling_bay: 5, displayStatus: 'STANDBY', mileage_km: 19000, hvac_hours: 1500, brake_wear_pct: 32, motor_temp_c: 65, branding_sla_hours_needed: 15.0, reason_code: null },
+  { id: 'TS-18', train_number: 'TS-18', stabling_bay: 15, displayStatus: 'STANDBY', mileage_km: 20000, hvac_hours: 1550, brake_wear_pct: 33, motor_temp_c: 65, branding_sla_hours_needed: 13.0, reason_code: null },
+  { id: 'TS-19', train_number: 'TS-19', stabling_bay: 20, displayStatus: 'INDUCTION_READY', mileage_km: 17500, hvac_hours: 1350, brake_wear_pct: 29, motor_temp_c: 64, branding_sla_hours_needed: 26.0, reason_code: null },
+  { id: 'TS-20', train_number: 'TS-20', stabling_bay: 21, displayStatus: 'INDUCTION_READY', mileage_km: 16000, hvac_hours: 1250, brake_wear_pct: 27, motor_temp_c: 63, branding_sla_hours_needed: 21.0, reason_code: null },
+  { id: 'TS-21', train_number: 'TS-21', stabling_bay: 22, displayStatus: 'INDUCTION_READY', mileage_km: 14000, hvac_hours: 1100, brake_wear_pct: 23, motor_temp_c: 62, branding_sla_hours_needed: 18.0, reason_code: null },
+  { id: 'TS-22', train_number: 'TS-22', stabling_bay: 23, displayStatus: 'STANDBY', mileage_km: 26000, hvac_hours: 1950, brake_wear_pct: 44, motor_temp_c: 68, branding_sla_hours_needed: 7.0, reason_code: null },
+  { id: 'TS-23', train_number: 'TS-23', stabling_bay: 24, displayStatus: 'INDUCTION_READY', mileage_km: 33000, hvac_hours: 2400, brake_wear_pct: 55, motor_temp_c: 72, branding_sla_hours_needed: 3.0, reason_code: null },
+  { id: 'TS-24', train_number: 'TS-24', stabling_bay: 25, displayStatus: 'INDUCTION_READY', mileage_km: 35000, hvac_hours: 2600, brake_wear_pct: 58, motor_temp_c: 74, branding_sla_hours_needed: 1.0, reason_code: null },
+  { id: 'TS-25', train_number: 'TS-25', stabling_bay: 3, displayStatus: 'STANDBY', mileage_km: 24000, hvac_hours: 1850, brake_wear_pct: 41, motor_temp_c: 67, branding_sla_hours_needed: 5.0, reason_code: null }
+];
 
 export default function App() {
   const [fleetData, setFleetData] = useState(INITIAL_FLEET);
@@ -38,15 +49,17 @@ export default function App() {
     setSelectedTrain(train);
   };
 
-  // Handler: Applying the Stabling Optimizer results updates global bay assignments
-  const handleApplyOptimization = (optimizedAssignments) => {
+  // Safe Handler: Applying optimization results updates global bay assignments
+  const handleApplyOptimization = (optimizationResult) => {
+    if (!optimizationResult || !Array.isArray(optimizationResult.assignments)) return;
+
     setFleetData((prevFleet) =>
       prevFleet.map((train) => {
-        const match = optimizedAssignments.find((a) => a.trainId === train.id);
+        const match = optimizationResult.assignments.find((a) => a.trainId === train.id);
         if (match) {
           return {
             ...train,
-            stabling_bay: match.recommendedBay
+            stabling_bay: match.bayNumber || match.recommendedBay
           };
         }
         return train;
