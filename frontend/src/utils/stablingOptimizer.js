@@ -1,10 +1,10 @@
-/**
- * Utility: Automated Stabling Bay Optimization Engine
- * Pairs fleet trains with optimal depot bays using a multi-criteria scoring algorithm.
- */
-
 export function runStablingOptimization(fleetData, totalBays = 25) {
-  const unassignedTrains = [...fleetData];
+  // Ensure fleetData is guaranteed to be an array
+  const safeFleetData = Array.isArray(fleetData) 
+    ? fleetData 
+    : (fleetData && Array.isArray(fleetData.trains) ? fleetData.trains : []);
+
+  const unassignedTrains = [...safeFleetData];
   const bayAssignments = [];
   const warnings = [];
 
@@ -51,7 +51,7 @@ export function runStablingOptimization(fleetData, totalBays = 25) {
 
       if (
         (train.displayStatus === 'MAINTENANCE_BLOCKED' && currentZone === 'MAINTENANCE_PITS') ||
-        (train.displayStatus === 'INDUCTION_READY' && train.branding_sla_hours_needed > 15 && currentZone === 'EXPRESS_INDUCTION') ||
+        (train.displayStatus === 'INDUCTION_READY' && (train.branding_sla_hours_needed || 0) > 15 && currentZone === 'EXPRESS_INDUCTION') ||
         (train.displayStatus === 'INDUCTION_READY' && currentZone === 'MAIN_STABLE_LINE')
       ) {
         assignedBay = currentBayNum;
@@ -71,7 +71,7 @@ export function runStablingOptimization(fleetData, totalBays = 25) {
     }
 
     // Strategy 2: High Priority / Ready trains to Express Lines (16-25)
-    if (!assignedBay && train.displayStatus === 'INDUCTION_READY' && train.branding_sla_hours_needed > 15) {
+    if (!assignedBay && train.displayStatus === 'INDUCTION_READY' && (train.branding_sla_hours_needed || 0) > 15) {
       for (let bay = 16; bay <= totalBays; bay++) {
         if (!occupiedBays.has(bay)) {
           assignedBay = bay;
