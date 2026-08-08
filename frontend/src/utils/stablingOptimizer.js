@@ -15,6 +15,16 @@ export function runStablingOptimization(fleetData, totalBays = 25) {
     return 'EXPRESS_INDUCTION';
   };
 
+  // Helper to extract clean numeric integer from formats like "Bay #19", "Bay 19", or 19
+  const parseBayNumber = (bayVal) => {
+    if (typeof bayVal === 'number') return bayVal;
+    if (typeof bayVal === 'string') {
+      const match = bayVal.match(/\d+/);
+      return match ? parseInt(match[0], 10) : null;
+    }
+    return null;
+  };
+
   // Sort trains by operational priority
   const prioritizedTrains = unassignedTrains.sort((a, b) => {
     if (a.displayStatus === 'MAINTENANCE_BLOCKED' && b.displayStatus !== 'MAINTENANCE_BLOCKED') return -1;
@@ -28,8 +38,29 @@ export function runStablingOptimization(fleetData, totalBays = 25) {
     let assignedBay = null;
     let reason = '';
 
+    const currentBayNum = parseBayNumber(train.stabling_bay || train.currentBay);
+
+    // Prefer keeping train in its current bay if its zone already matches operational intent
+    if (
+      currentBayNum &&
+      !occupiedBays.has(currentBayNum) &&
+      currentBayNum >= 1 &&
+      currentBayNum <= totalBays
+    ) {
+      const currentZone = getBayZone(currentBayNum);
+
+      if (
+        (train.displayStatus === 'MAINTENANCE_BLOCKED' && currentZone === 'MAINTENANCE_PITS') ||
+        (train.displayStatus === 'INDUCTION_READY' && train.branding_sla_hours_needed > 15 && currentZone === 'EXPRESS_INDUCTION') ||
+        (train.displayStatus === 'INDUCTION_READY' && currentZone === 'MAIN_STABLE_LINE')
+      ) {
+        assignedBay = currentBayNum;
+        reason = 'Optimal In-Place Allocation (Zero Shunt Required)';
+      }
+    }
+
     // Strategy 1: Assign Maintenance Blocked trains to Maintenance Pit bays (1-5)
-    if (train.displayStatus === 'MAINTENANCE_BLOCKED') {
+    if (!assignedBay && train.displayStatus === 'MAINTENANCE_BLOCKED') {
       for (let bay = 1; bay <= 5; bay++) {
         if (!occupiedBays.has(bay)) {
           assignedBay = bay;
@@ -75,14 +106,19 @@ export function runStablingOptimization(fleetData, totalBays = 25) {
 
     if (assignedBay) {
       occupiedBays.add(assignedBay);
+      
+      const requiresShunting = currentBayNum !== assignedBay;
+
       bayAssignments.push({
         trainId: train.id,
-        currentBay: train.stabling_bay,
-        recommendedBay: assignedBay,
+        currentBay: currentBayNum ? `Bay #${currentBayNum}` : 'Unassigned',
+        recommendedBay: `Bay #${assignedBay}`,
+        bayNumber: assignedBay,
         zone: getBayZone(assignedBay),
         status: train.displayStatus,
         reason,
-        requiresShunting: train.stabling_bay !== assignedBay
+        requiresShunting,
+        shuntingStatus: requiresShunting ? 'Shunt Required' : 'In Position'
       });
     } else {
       warnings.push(`CRITICAL: Depot Capacity Exceeded! No available bay for Train ${train.id}`);
@@ -92,7 +128,7 @@ export function runStablingOptimization(fleetData, totalBays = 25) {
   const shuntingCount = bayAssignments.filter((a) => a.requiresShunting).length;
 
   return {
-    assignments: bayAssignments.sort((a, b) => a.recommendedBay - b.recommendedBay),
+    assignments: bayAssignments.sort((a, b) => a.bayNumber - b.bayNumber),
     shuntingCount,
     warnings,
     optimizationScore: Math.max(0, Math.round(100 - (shuntingCount * 2.5) - (warnings.length * 10)))
